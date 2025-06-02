@@ -129,12 +129,43 @@ The model uses several types of features:
 - Performance is evaluated using Mean Absolute Error (MAE)
 - Models are trained for both 1-week and 4-week prediction horizons
 
+### Model Assumptions
+
+The Random Forest-based forecasting model operates under several key assumptions:
+
+1.  **Stability of Relationships**: The model assumes that the relationships between the engineered features (like rolling means, marketing indicators, and historical orders) and the box order volumes observed in the training data will remain relatively stable and continue to hold true for the prediction period. Significant shifts in underlying customer behavior or market dynamics not captured by the features could reduce accuracy.
+2.  **Feature Sufficiency**: It's assumed that the features engineered (e.g., rolling means, lag features, holiday indicators, box types) are comprehensive enough to capture the primary drivers of box order fluctuations. If there are other significant external factors not included as features (e.g., competitor activities, sudden economic changes), the model might not account for their impact.
+3.  **Effectiveness of Global Modeling**: By using a single global model with 'box type' as a feature, the approach assumes that there are learnable common patterns and relationships across different box types. It also assumes that the model can effectively differentiate and adapt its predictions for individual box types based on this feature.
+
 ## Model Evaluation
 
 The model's performance is evaluated using:
 - Mean Absolute Error (MAE)
 - Correlation between actuals and predicted values
 - Comparison with a dummy regressor (previous week's orders)
+
+### Performance Monitoring and Drift Detection
+
+Once deployed, continuous monitoring is crucial to ensure the model's predictive accuracy remains high and to detect any degradation in performance over time. This degradation can occur due to several reasons, broadly categorized as model drift.
+
+**Types of Drift:**
+
+1.  **Concept Drift**: This occurs when the statistical properties of the target variable (box orders) change over time, or the underlying relationship between input features and the target variable changes. For example, shifts in customer preferences, new market trends, or long-term effects of business strategies might lead to concept drift. The model, trained on historical data, may no longer accurately reflect these new relationships.
+2.  **Data Drift**: This refers to changes in the statistical properties of the input features themselves. For instance, a significant change in the average number of weekly subscribers, the introduction of new marketing campaigns not seen during training, or changes in how box types are categorized could constitute data drift. If the live data significantly deviates from the training data distribution, the model's performance can suffer.
+
+**Monitoring Strategies:**
+
+To detect and address these types of drift, the following strategies should be implemented:
+
+*   **Track Key Performance Metrics**: Regularly re-evaluate the model on new, incoming data using the same metrics established during the evaluation phase (e.g., Mean Absolute Error, correlation). A significant decline in these metrics compared to the baseline is a strong indicator of drift.
+*   **Monitor Feature Distributions**: Continuously track the statistical distributions (e.g., mean, median, variance, presence of categories) of the key input features used by the model. Compare these live distributions against the distributions observed in the training dataset. Statistical tests like the Kolmogorov-Smirnov test (for numerical features) or Chi-Squared test (for categorical features) can help quantify the extent of drift.
+*   **Monitor Target Variable Distribution**: Observe the distribution of the actual box orders over time. Unexpected shifts in this distribution can indicate that the underlying process generating the orders is changing.
+*   **Monitor Prediction Distribution**: Analyze the distribution of the model's predictions on new data. If the model starts predicting values that are systematically different (e.g., consistently higher or lower, or with a different spread) than observed during training and validation, it might be a sign of drift or that the model is encountering out-of-distribution data.
+*   **Set Up Alerting Mechanisms**: Implement automated alerts that trigger when performance metrics drop below predefined thresholds or when significant statistical drift is detected in features or predictions.
+
+**Addressing Drift:**
+
+If significant drift is detected, it typically necessitates retraining the model with more recent data that reflects the current state of the environment. The frequency of retraining might be periodic (e.g., every quarter) or event-triggered (i.e., when drift is detected).
 
 ## Results
 
