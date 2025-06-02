@@ -144,10 +144,12 @@ The model generates several visualizations to evaluate its performance for both 
 ### 1-Week Horizon Predictions
 #### Actuals vs Predicted vs Dummy Regressor
 ![1-Week Actuals vs Predicted](res/actual_vs_predicted_1w.png)
+
 *This plot compares the actual box orders (ground truth) with the predictions made by the Random Forest model and a simple dummy regressor (which predicts the previous week's orders) for the 1-week forecast horizon. It helps visualize the model's accuracy against a baseline.*
 
 #### Regression Plot: Actual vs. Predicted
 ![1-Week Regplot](res/actual_vs_predicted_regplot_1w.png)
+
 *This regression plot visualizes the relationship between the actual values and the values predicted by the ML model for the 1-week horizon. A tighter clustering of points around the diagonal line (indicating perfect prediction) signifies better model performance. When compared to the dummy regressor (which simply predicts the previous week's orders), the ML model's predictions align more closely with the actuals, demonstrating significantly lower error and higher accuracy.*
 
 #### Regression Plot: Actual vs. Dummy Regressor
@@ -157,23 +159,28 @@ The model generates several visualizations to evaluate its performance for both 
 
 #### Feature Importances
 ![1-Week Feature Importances](res/feature_importances_1w.png)
+
 *This chart displays the relative importance of each feature used by the Random Forest model for the 1-week predictions. It helps understand which factors (e.g., rolling means, specific box types, marketing weeks) have the most influence on the forecast.*
 
 #### Predictions Distribution
 ![1-Week Predictions Distribution](res/predictions_distribution_1w.png)
+
 *This histogram shows the distribution of the predicted box order values from the ML model for the 1-week horizon. It helps to understand the range and frequency of the model's forecasts.*
 
 #### Actuals Distribution
 ![1-Week Actuals Distribution](res/actual_distribution_1w.png)
+
 *This histogram displays the distribution of the actual box order values in the test set for the 1-week horizon. Comparing this to the predictions distribution can reveal if the model captures the general characteristics of the true data distribution.*
 
 ### 4-Week Horizon Predictions
 #### Actuals vs Predicted vs Dummy Regressor
 ![4-Week Actuals vs Predicted](res/actual_vs_predicted_4w.png)
+
 *Similar to the 1-week horizon, this plot compares actual box orders with predictions from the Random Forest model and the dummy regressor, but for the 4-week forecast horizon. It allows for an assessment of the model's performance over a longer prediction window.*
 
 #### Regression Plot: Actual vs. Predicted
 ![4-Week Regplot](res/actual_vs_predicted_regplot_4w.png)
+
 *Similarly, for the 4-week horizon, this regression plot compares the ML model's predictions against the actual values. The ML model again shows a stronger correlation and less scatter compared to what would be observed with the dummy regressor, indicating its superior ability to forecast orders even further into the future. The dummy regressor's performance would typically degrade more sharply over a longer horizon, making the ML model's advantage even more pronounced.*
 
 #### Regression Plot: Actual vs. Dummy Regressor
@@ -181,14 +188,17 @@ The model generates several visualizations to evaluate its performance for both 
 
 #### Feature Importances
 ![4-Week Feature Importances](res/feature_importances_4w.png)
+
 *This chart shows the feature importances for the Random Forest model trained for the 4-week prediction horizon. It can be compared with the 1-week feature importances to see if the influential factors change with the forecast duration.*
 
 #### Predictions Distribution
 ![4-Week Predictions Distribution](res/predictions_distribution_4w.png)
+
 *This histogram illustrates the distribution of the predicted box order values from the ML model for the 4-week horizon, providing insight into the model's forecast characteristics at this longer range.*
 
 #### Actuals Distribution
 ![4-Week Actuals Distribution](res/actual_distribution_4w.png)
+
 *This histogram shows the distribution of actual box order values in the test set for the 4-week horizon, serving as a reference to evaluate the realism of the model's prediction distribution.*
 
 
