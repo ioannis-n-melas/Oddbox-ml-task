@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import lib
 import importlib
+import mlflow
 
 importlib.reload(lib)
 

@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+
+# MLflow
+src/mlruns/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# OS-specific
+.DS_Store
+
+# Data files (if you have large data files you don't want to commit)
+# data/
+
+# Results/output files (if you don't want to commit generated plots/results outside mlruns)
+# res/ 

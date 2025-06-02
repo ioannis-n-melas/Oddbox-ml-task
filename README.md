@@ -247,3 +247,48 @@ The model generates several visualizations to evaluate its performance for both 
 - seaborn
 - scikit-learn
 
+## MLflow Integration for Experiment Tracking
+
+This project uses [MLflow](https://mlflow.org/) to log and track machine learning experiments. This allows for versioning of models, parameters, metrics, and artifacts.
+
+### Setup
+
+1.  **Install MLflow**:
+    If you haven't already, install MLflow. It's included in the `requirements.txt` file, so if you've set up your environment using that, you should be good to go. Otherwise, you can install it via pip:
+    ```bash
+    pip install mlflow
+    ```
+
+### Running Experiments
+
+1.  **Execute the main script**:
+    Run the main training script located in the `src` directory:
+    ```bash
+    python src/main.py
+    ```
+    The script is configured to automatically log parameters (like `time_horizon`), metrics (like MAE and R-squared), the trained RandomForest model, and generated plots as artifacts to MLflow.
+
+2.  **MLflow Data Storage**:
+    MLflow will store all experiment data locally within an `mlruns` directory. In this project, this directory will be created at `src/mlruns/` when you first run the script.
+    This `src/mlruns/` directory is included in the `.gitignore` file, so it will not be committed to the Git repository.
+
+### Viewing Results with MLflow UI
+
+1.  **Navigate to the correct directory**:
+    Open your terminal and change to the `src` directory, as this is where the `mlruns` folder is located:
+    ```bash
+    cd src
+    ```
+
+2.  **Start the MLflow UI**:
+    From within the `src` directory, run the following command:
+    ```bash
+    mlflow ui
+    ```
+    This will start a local web server (usually at `http://localhost:5000`).
+
+3.  **Open in Browser**:
+    Open the URL provided by the `mlflow ui` command in your web browser to view the experiment runs, compare parameters and metrics, and examine the logged artifacts (models, plots, etc.).
+
+Each execution of `src/main.py` will create a new run within MLflow, allowing you to track changes and performance over time.
+

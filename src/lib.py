@@ -5,6 +5,8 @@ import seaborn as sns
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error
 from typing import List, Tuple, Any
+import mlflow
+import mlflow.sklearn
 
 def data_preprocessing(data_dir: str) -> pd.DataFrame:
     """Preprocess the raw data for analysis and modeling.
@@ -146,78 +148,111 @@ def RF_forecast(
     # rolling features
     rolling_features = train_df_concat.columns[train_df_concat.columns.str.contains('rolling_mean_')].tolist()
 
-    # train global model
-    rf_regressor_global = RandomForestRegressor(n_estimators=1000, random_state=42, max_depth=10)
-    rf_regressor_global.fit(train_df_concat[rolling_features + box_type_features + features].drop(columns=leaky_features), train_df_concat[target])
+    with mlflow.start_run():
+        # Log parameters
+        mlflow.log_param("time_horizon", time_horizon)
+        mlflow.log_param("n_estimators", 1000) # Assuming n_estimators is fixed
+        mlflow.log_param("max_depth", 10) # Assuming max_depth is fixed
 
-    # Predict on the concatenated test dataframes
-    test_df_concat['predicted_box_orders_global'] = rf_regressor_global.predict(test_df_concat[rolling_features + box_type_features + features].drop(columns=leaky_features))
 
-    # calculate MAE for global model
-    mae_global = mean_absolute_error(test_df_concat[target], test_df_concat['predicted_box_orders_global'])
-    print(f'MAE for global model: {mae_global}')
+        # train global model
+        rf_regressor_global = RandomForestRegressor(n_estimators=1000, random_state=42, max_depth=10)
+        rf_regressor_global.fit(train_df_concat[rolling_features + box_type_features + features].drop(columns=leaky_features), train_df_concat[target])
 
-    # plot actual vs predicted
-    sns.lineplot(data=test_df_concat, x=test_df_concat.index, y=target, label='Actual')
-    sns.lineplot(data=test_df_concat, x=test_df_concat.index, y='predicted_box_orders_global', label='Predicted')
-    sns.lineplot(data=test_df_concat, x=test_df_concat.index, y='dummy_regressor', label='Dummy Regressor')
-    plt.title('Actual vs Predicted for Global Model')
-    plt.tight_layout()
-    plt.savefig(f'{res_dir}/actual_vs_predicted_{time_horizon}w.png')
-    plt.close()
+        # Predict on the concatenated test dataframes
+        test_df_concat['predicted_box_orders_global'] = rf_regressor_global.predict(test_df_concat[rolling_features + box_type_features + features].drop(columns=leaky_features))
 
-    # plot actual vs predicted for each box type separately
-    for box_type in box_types:
-        test_data_i = test_df_concat[test_df_concat['boxType_' + box_type] == 1]
-        sns.lineplot(data=test_data_i, x=test_data_i.index, y=target, label='Actual')
-        sns.lineplot(data=test_data_i, x=test_data_i.index, y='predicted_box_orders_global', label='Predicted')
-        plt.title('Actual vs Predicted for ' + box_type)
+        # calculate MAE for global model
+        mae_global = mean_absolute_error(test_df_concat[target], test_df_concat['predicted_box_orders_global'])
+        print(f'MAE for global model: {mae_global}')
+        mlflow.log_metric("mae_global", mae_global)
+
+        # plot actual vs predicted
+        plt.figure()
+        sns.lineplot(data=test_df_concat, x=test_df_concat.index, y=target, label='Actual')
+        sns.lineplot(data=test_df_concat, x=test_df_concat.index, y='predicted_box_orders_global', label='Predicted')
+        sns.lineplot(data=test_df_concat, x=test_df_concat.index, y='dummy_regressor', label='Dummy Regressor')
+        plt.title('Actual vs Predicted for Global Model')
         plt.tight_layout()
-        plt.savefig(f'{res_dir}/actual_vs_predicted_{time_horizon}w_{box_type}.png')
+        actual_vs_predicted_path = f'{res_dir}/actual_vs_predicted_{time_horizon}w.png'
+        plt.savefig(actual_vs_predicted_path)
+        mlflow.log_artifact(actual_vs_predicted_path)
+        plt.close()
+
+        # plot actual vs predicted for each box type separately
+        for box_type in box_types:
+            plt.figure()
+            test_data_i = test_df_concat[test_df_concat['boxType_' + box_type] == 1]
+            sns.lineplot(data=test_data_i, x=test_data_i.index, y=target, label='Actual')
+            sns.lineplot(data=test_data_i, x=test_data_i.index, y='predicted_box_orders_global', label='Predicted')
+            plt.title('Actual vs Predicted for ' + box_type)
+            plt.tight_layout()
+            actual_vs_predicted_box_type_path = f'{res_dir}/actual_vs_predicted_{time_horizon}w_{box_type}.png'
+            plt.savefig(actual_vs_predicted_box_type_path)
+            mlflow.log_artifact(actual_vs_predicted_box_type_path)
+            plt.close()
+
+
+        # feature importance
+        plt.figure()
+        importances = rf_regressor_global.feature_importances_
+        feature_names = train_df_concat[rolling_features + box_type_features + features].drop(columns=leaky_features).columns.tolist()
+        feature_importances = pd.Series(importances, index=feature_names)
+        feature_importances = feature_importances.sort_values(ascending=False)
+        sns.barplot(x=feature_importances, y=feature_importances.index, orient='h')
+        plt.title('Feature Importances for Global Model')
+        plt.tight_layout()
+        feature_importances_path = f'{res_dir}/feature_importances_{time_horizon}w.png'
+        plt.savefig(feature_importances_path)
+        mlflow.log_artifact(feature_importances_path)
         plt.close()
 
 
-    # feature importance
-    importances = rf_regressor_global.feature_importances_
-    feature_names = train_df_concat[rolling_features + box_type_features + features].drop(columns=leaky_features).columns.tolist()
-    feature_importances = pd.Series(importances, index=feature_names)
-    feature_importances = feature_importances.sort_values(ascending=False)
-    sns.barplot(x=feature_importances, y=feature_importances.index, orient='h')
-    plt.title('Feature Importances for Global Model')
-    plt.tight_layout()
-    plt.savefig(f'{res_dir}/feature_importances_{time_horizon}w.png')
-    plt.close()
+        # also sns regplot of actual vs predicted global model
+        plt.figure()
+        sns.regplot(data=test_df_concat, x = target, y = 'predicted_box_orders_global')
+        r_squared = test_df_concat[target].corr(test_df_concat["predicted_box_orders_global"])**2
+        mlflow.log_metric("r_squared_global", r_squared)
+        print(f'R^2 for global model: {r_squared}')
+        plt.title('Actual vs Predicted for Global Model')
+        plt.tight_layout()
+        actual_vs_predicted_regplot_path = f'{res_dir}/actual_vs_predicted_regplot_{time_horizon}w.png'
+        plt.savefig(actual_vs_predicted_regplot_path)
+        mlflow.log_artifact(actual_vs_predicted_regplot_path)
+        plt.close()
 
+        # same for the dummy regressor
+        plt.figure()
+        sns.regplot(data=test_df_concat, x = target, y = 'dummy_regressor')
+        plt.title('Actual vs Dummy Regressor for Global Model') 
+        plt.tight_layout()
+        actual_vs_dummy_regressor_regplot_path = f'{res_dir}/actual_vs_dummy_regressor_regplot_{time_horizon}w.png'
+        plt.savefig(actual_vs_dummy_regressor_regplot_path)
+        mlflow.log_artifact(actual_vs_dummy_regressor_regplot_path)
+        plt.close()
 
-    # also sns regplot of actual vs predicted global model
-    sns.regplot(data=test_df_concat, x = target, y = 'predicted_box_orders_global')
-    # print r^2
-    print(f'R^2 for global model: {test_df_concat[target].corr(test_df_concat["predicted_box_orders_global"])}')
-    plt.title('Actual vs Predicted for Global Model')
-    plt.tight_layout()
-    plt.savefig(f'{res_dir}/actual_vs_predicted_regplot_{time_horizon}w.png')
-    plt.close()
+        # plot distribution of predictions in histogram
+        plt.figure()
+        sns.histplot(data=test_df_concat, x='predicted_box_orders_global')
+        plt.title('Distribution of Predictions for Global Model')
+        plt.tight_layout()
+        predictions_distribution_path = f'{res_dir}/predictions_distribution_{time_horizon}w.png'
+        plt.savefig(predictions_distribution_path)
+        mlflow.log_artifact(predictions_distribution_path)
+        plt.close()
 
-    # same for the dummy regressor
-    sns.regplot(data=test_df_concat, x = target, y = 'dummy_regressor')
-    plt.title('Actual vs Dummy Regressor for Global Model') 
-    plt.tight_layout()
-    plt.savefig(f'{res_dir}/actual_vs_dummy_regressor_regplot_{time_horizon}w.png')
-    plt.close()
+        # plot distribution of actual in histogram
+        plt.figure()
+        sns.histplot(data=test_df_concat, x=target)
+        plt.title('Distribution of Actual for Global Model')
+        plt.tight_layout()
+        actual_distribution_path = f'{res_dir}/actual_distribution_{time_horizon}w.png'
+        plt.savefig(actual_distribution_path)
+        mlflow.log_artifact(actual_distribution_path)
+        plt.close()
 
-    # plot distribution of predictions in histogram
-    sns.histplot(data=test_df_concat, x='predicted_box_orders_global')
-    plt.title('Distribution of Predictions for Global Model')
-    plt.tight_layout()
-    plt.savefig(f'{res_dir}/predictions_distribution_{time_horizon}w.png')
-    plt.close()
-
-    # plot distribution of actual in histogram
-    sns.histplot(data=test_df_concat, x=target)
-    plt.title('Distribution of Actual for Global Model')
-    plt.tight_layout()
-    plt.savefig(f'{res_dir}/actual_distribution_{time_horizon}w.png')
-    plt.close()
+        # Log the model
+        mlflow.sklearn.log_model(rf_regressor_global, "random-forest-model")
 
     return test_df_concat, train_df_concat, mae_global, rf_regressor_global, features, box_type_features, rolling_features, leaky_features
 
