@@ -168,7 +168,7 @@ def RF_forecast(df, box_types, features, target):
 
         # calculate rolling average of all features and target 1, 2, 4, 6, 8, 12 weeks ago without the current week
         # window_size = 2
-        for window_size in [1, 2, 4]:
+        for window_size in [1, 4]:
             df_i[f'{target}_rolling_mean_{window_size}w'] = df_i[target].shift(1).rolling(window=window_size, min_periods=1).mean()
             for feature in [x for x in features if x != 'week']:
                 # Ensure the feature column exists before trying to calculate rolling mean
@@ -189,7 +189,7 @@ def RF_forecast(df, box_types, features, target):
         test_df = df_i.iloc[int(len(df_i) * 0.8):]
 
         # train Random Forest regressor
-        rf_regressor = RandomForestRegressor(n_estimators=1000, random_state=42, max_depth=5)
+        rf_regressor = RandomForestRegressor(n_estimators=1000, random_state=42, max_depth=10)
         rf_regressor.fit(train_df[rolling_features + features].drop(columns=leaky_features).drop(columns='week'), train_df[target])
 
         # predict on test set
@@ -197,6 +197,12 @@ def RF_forecast(df, box_types, features, target):
 
         # also assign to predicted_box_orders
         test_df['predicted_box_orders'] = test_df['predicted_box_orders_' + box_type]
+
+        # add a dummy regressor equal to the shifted target
+        test_df['dummy_regressor'] = test_df[target].shift(1)
+
+        # drop na
+        test_df = test_df.dropna()
 
         # calculate MAE
         mae = mean_absolute_error(test_df[target], test_df['predicted_box_orders_' + box_type])
@@ -267,6 +273,7 @@ def RF_forecast(df, box_types, features, target):
     # plot actual vs predicted
     sns.lineplot(data=test_df_concat, x=test_df_concat.index, y=target, label='Actual')
     sns.lineplot(data=test_df_concat, x=test_df_concat.index, y='predicted_box_orders_concat', label='Predicted')
+    sns.lineplot(data=test_df_concat, x=test_df_concat.index, y='dummy_regressor', label='Dummy Regressor')
     plt.title('Actual vs Predicted for Concatenated Data')
     plt.tight_layout()
     plt.savefig('actual_vs_predicted_concat.png')
@@ -279,6 +286,29 @@ def RF_forecast(df, box_types, features, target):
     plt.tight_layout()
     plt.savefig('actual_vs_predicted_each_box_type.png')
     plt.close()
+
+    # plot actual vs predicted for each box type separately
+    for box_type in box_types:
+        test_data_i = test_df_concat[test_df_concat['boxType_' + box_type] == 1]
+        sns.lineplot(data=test_data_i, x=test_data_i.index, y=target, label='Actual')
+        sns.lineplot(data=test_data_i, x=test_data_i.index, y='predicted_box_orders_concat', label='Predicted')
+        plt.title('Actual vs Predicted for ' + box_type)
+        plt.tight_layout()
+        plt.savefig('actual_vs_predicted_concat_' + box_type + '.png')
+        plt.close()
+
+
+    # feature importance
+    importances = rf_regressor_concat.feature_importances_
+    feature_names = train_df_concat[rolling_features + box_type_features + features].drop(columns=leaky_features).drop(columns='week').columns.tolist()
+    feature_importances = pd.Series(importances, index=feature_names)
+    feature_importances = feature_importances.sort_values(ascending=False)
+    sns.barplot(x=feature_importances, y=feature_importances.index, orient='h')
+    plt.title('Feature Importances for Concatenated Data')
+    plt.tight_layout()
+    plt.savefig('feature_importances_concat.png')
+    plt.close()
+
 
 
     # also sns regplot of actual vs predicted concat
@@ -297,6 +327,13 @@ def RF_forecast(df, box_types, features, target):
     plt.title('Actual vs Predicted for Each Box Type')
     plt.tight_layout()
     plt.savefig('actual_vs_predicted_each_box_type_regplot.png')
+    plt.close()
+
+    # same for the dummy regressor
+    sns.regplot(data=test_df_concat, x = target, y = 'dummy_regressor')
+    plt.title('Actual vs Dummy Regressor for Concatenated Data')
+    plt.tight_layout()
+    plt.savefig('actual_vs_dummy_regressor_concat_regplot.png')
     plt.close()
 
 
