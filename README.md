@@ -238,6 +238,13 @@ The model generates several visualizations to evaluate its performance for both 
 - Analyze box composition: Investigate the ingredients of each box to understand if similarities in composition influence customer choices or switching patterns. For example, do customers switch between boxes that share common ingredients or have similar sizes?
 - Individual subscriber data: Incorporate data on individual subscriber behavior to model how users transition between different box types. This could reveal patterns related to preferences, seasonality, or responses to promotions, leading to more accurate and personalized forecasts.
 
+## Stretch Goals
+
+- At Oddbox, customers can swap produce items in their box with one of N alternatives. How would you approach incorporating this customisation logic into your demand forecast?
+
+I would engineer features to capture the swap activity. These features would then be used in similar fashion to all other features of the model. Additionally, I would consider using the box composition alongside the box type and swap activity to capture the effect of the swap on the box demand.
+
+
 
 ## Dependencies
 
