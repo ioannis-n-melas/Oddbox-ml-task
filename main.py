@@ -339,9 +339,21 @@ plt.savefig('actual_vs_predicted_each_box_type.png')
 plt.close()
 
 
-# also sns regplot of actual vs predicted for each box type
-sns.regplot(data=test_df_concat, x=target, y='predicted_box_orders', hue='box_type')
+# also sns regplot of actual vs predicted concat
+sns.regplot(data=test_df_concat, x = target, y = 'predicted_box_orders_concat')
+# print r^2
+print(f'R^2 for concatenated data: {test_df_concat[target].corr(test_df_concat["predicted_box_orders_concat"])}')
+plt.title('Actual vs Predicted for Concatenated Data')
+plt.tight_layout()
+plt.savefig('actual_vs_predicted_concat_regplot.png')
+plt.close()
+
+# same for each box type
+sns.regplot(data=test_df_concat, x = target, y = 'predicted_box_orders')
+# print r^2
+print(f'R^2 for each box type: {test_df_concat[target].corr(test_df_concat["predicted_box_orders"])}')
 plt.title('Actual vs Predicted for Each Box Type')
 plt.tight_layout()
 plt.savefig('actual_vs_predicted_each_box_type_regplot.png')
 plt.close()
+
