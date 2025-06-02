@@ -5,14 +5,42 @@ import seaborn as sns
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error
 
+def data_preprocessing():
 
-def RF_forecast(df):
+    df = pd.read_csv('../data/data.csv')
 
-    # box_types
-    box_types = df['box_type'].unique()
+    # replace '1O0' with '100'
+    df['box_orders'] = df['box_orders'].str.replace('1O0', '100')
 
-    # drop box_type
-    df.drop(columns=['box_type'], inplace=True)
+    # box_orders to float
+    df['box_orders'] = df['box_orders'].astype(float)
+
+    # convert week to datetime
+    df['week'] = pd.to_datetime(df['week'])
+
+    # is_marketing_week to int
+    df['is_marketing_week'] = df['is_marketing_week'].astype(int)
+
+    # holiday_week to int
+    df['holiday_week'] = df['holiday_week'].astype(int)
+
+    # get dummy variables for box_type
+    box_type_dummies = pd.get_dummies(df['box_type'], prefix='boxType')
+
+    # as int
+    box_type_dummies = box_type_dummies.astype(int)
+
+    # add box_type_dummies to data
+    df = pd.concat([df, box_type_dummies], axis=1)
+
+
+    return df 
+
+
+
+
+def RF_forecast(df, box_types, time_horizon=1):
+
 
     # features = all columns except columns with boxType_ in the name and week
     features = [col for col in df.columns if not col.startswith('boxType_') and col != 'week']
@@ -38,11 +66,11 @@ def RF_forecast(df):
         df_i = df_i.sort_values(by='week')
         
         for window_size in [1, 4]:
-            df_i[f'{target}_rolling_mean_{window_size}w'] = df_i[target].shift(1).rolling(window=window_size, min_periods=1).mean()
+            df_i[f'{target}_rolling_mean_{window_size}w'] = df_i[target].shift(time_horizon).rolling(window=window_size, min_periods=1).mean()
             for feature in features:
                 # Ensure the feature column exists before trying to calculate rolling mean
                 if feature in df_i.columns:
-                    df_i[f'{feature}_rolling_mean_{window_size}w'] = df_i[feature].shift(1).rolling(window=window_size, min_periods=1).mean()
+                    df_i[f'{feature}_rolling_mean_{window_size}w'] = df_i[feature].shift(time_horizon).rolling(window=window_size, min_periods=1).mean()
 
         # drop rows with NaN
         df_i = df_i.dropna()
@@ -52,7 +80,7 @@ def RF_forecast(df):
         test_df = df_i.iloc[int(len(df_i) * 0.8):]
 
         # add a dummy regressor equal to the shifted target
-        test_df['dummy_regressor'] = test_df[target].shift(1)
+        test_df['dummy_regressor'] = test_df[target].shift(time_horizon)
 
         # drop na
         test_df = test_df.dropna()
@@ -92,7 +120,7 @@ def RF_forecast(df):
     sns.lineplot(data=test_df_concat, x=test_df_concat.index, y='dummy_regressor', label='Dummy Regressor')
     plt.title('Actual vs Predicted for Global Model')
     plt.tight_layout()
-    plt.savefig('../res/actual_vs_predicted.png')
+    plt.savefig(f'../res/actual_vs_predicted_{time_horizon}w.png')
     plt.close()
 
     # plot actual vs predicted for each box type separately
@@ -102,7 +130,7 @@ def RF_forecast(df):
         sns.lineplot(data=test_data_i, x=test_data_i.index, y='predicted_box_orders_global', label='Predicted')
         plt.title('Actual vs Predicted for ' + box_type)
         plt.tight_layout()
-        plt.savefig('../res/actual_vs_predicted_' + box_type + '.png')
+        plt.savefig(f'../res/actual_vs_predicted_{time_horizon}w_{box_type}.png')
         plt.close()
 
 
@@ -114,7 +142,7 @@ def RF_forecast(df):
     sns.barplot(x=feature_importances, y=feature_importances.index, orient='h')
     plt.title('Feature Importances for Global Model')
     plt.tight_layout()
-    plt.savefig('../res/feature_importances.png')
+    plt.savefig(f'../res/feature_importances_{time_horizon}w.png')
     plt.close()
 
 
@@ -124,28 +152,28 @@ def RF_forecast(df):
     print(f'R^2 for global model: {test_df_concat[target].corr(test_df_concat["predicted_box_orders_global"])}')
     plt.title('Actual vs Predicted for Global Model')
     plt.tight_layout()
-    plt.savefig('../res/actual_vs_predicted_regplot.png')
+    plt.savefig(f'../res/actual_vs_predicted_regplot_{time_horizon}w.png')
     plt.close()
 
     # same for the dummy regressor
     sns.regplot(data=test_df_concat, x = target, y = 'dummy_regressor')
     plt.title('Actual vs Dummy Regressor for Global Model') 
     plt.tight_layout()
-    plt.savefig('../res/actual_vs_dummy_regressor_regplot.png')
+    plt.savefig(f'../res/actual_vs_dummy_regressor_regplot_{time_horizon}w.png')
     plt.close()
 
     # plot distribution of predictions in histogram
     sns.histplot(data=test_df_concat, x='predicted_box_orders_global')
     plt.title('Distribution of Predictions for Global Model')
     plt.tight_layout()
-    plt.savefig('../res/predictions_distribution.png')
+    plt.savefig(f'../res/predictions_distribution_{time_horizon}w.png')
     plt.close()
 
     # plot distribution of actual in histogram
     sns.histplot(data=test_df_concat, x=target)
     plt.title('Distribution of Actual for Global Model')
     plt.tight_layout()
-    plt.savefig('../res/actual_distribution.png')
+    plt.savefig(f'../res/actual_distribution_{time_horizon}w.png')
     plt.close()
 
     return test_df_concat, train_df_concat, mae_global, rf_regressor_global, features, box_type_features, rolling_features, leaky_features
