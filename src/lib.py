@@ -4,10 +4,25 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error
+from typing import List, Tuple, Any
 
-def data_preprocessing():
+def data_preprocessing(data_dir: str) -> pd.DataFrame:
+    """Preprocess the raw data for analysis and modeling.
 
-    df = pd.read_csv('../data/data.csv')
+    This function performs several preprocessing steps:
+    1. Reads the CSV data
+    2. Fixes data type issues in box_orders
+    3. Converts week to datetime
+    4. Converts boolean columns to integers
+    5. Creates dummy variables for box_type
+
+    Args:
+        data_dir (str): Directory path containing the data.csv file
+
+    Returns:
+        pd.DataFrame: Preprocessed DataFrame with all necessary transformations
+    """
+    df = pd.read_csv(data_dir + '/data.csv')
 
     # replace '1O0' with '100'
     df['box_orders'] = df['box_orders'].str.replace('1O0', '100')
@@ -33,15 +48,43 @@ def data_preprocessing():
     # add box_type_dummies to data
     df = pd.concat([df, box_type_dummies], axis=1)
 
-
     return df 
 
 
 
 
-def RF_forecast(df, box_types, time_horizon=1):
+def RF_forecast(
+    df: pd.DataFrame,
+    box_types: List[str],
+    time_horizon: int = 1,
+    res_dir: str = '../res'
+) -> Tuple[pd.DataFrame, pd.DataFrame, float, RandomForestRegressor, List[str], List[str], List[str], List[str]]:
+    """Train and evaluate a Random Forest model for box order forecasting.
 
+    This function:
+    1. Creates rolling mean features for different window sizes
+    2. Splits data into train/test sets
+    3. Trains a global Random Forest model
+    4. Generates predictions and various evaluation plots
+    5. Calculates feature importances
 
+    Args:
+        df (pd.DataFrame): Preprocessed DataFrame from data_preprocessing
+        box_types (List[str]): List of box types to forecast
+        time_horizon (int, optional): Number of weeks to forecast ahead. Defaults to 1.
+        res_dir (str, optional): Directory to save results and plots. Defaults to '../res'.
+
+    Returns:
+        Tuple containing:
+            - pd.DataFrame: Test DataFrame with predictions
+            - pd.DataFrame: Train DataFrame
+            - float: MAE score for global model
+            - RandomForestRegressor: Trained global model
+            - List[str]: List of feature names
+            - List[str]: List of box type feature names
+            - List[str]: List of rolling feature names
+            - List[str]: List of leaky feature names
+    """
     # features = all columns except columns with boxType_ in the name and week
     features = [col for col in df.columns if not col.startswith('boxType_') and col != 'week']
 
@@ -120,7 +163,7 @@ def RF_forecast(df, box_types, time_horizon=1):
     sns.lineplot(data=test_df_concat, x=test_df_concat.index, y='dummy_regressor', label='Dummy Regressor')
     plt.title('Actual vs Predicted for Global Model')
     plt.tight_layout()
-    plt.savefig(f'../res/actual_vs_predicted_{time_horizon}w.png')
+    plt.savefig(f'{res_dir}/actual_vs_predicted_{time_horizon}w.png')
     plt.close()
 
     # plot actual vs predicted for each box type separately
@@ -130,7 +173,7 @@ def RF_forecast(df, box_types, time_horizon=1):
         sns.lineplot(data=test_data_i, x=test_data_i.index, y='predicted_box_orders_global', label='Predicted')
         plt.title('Actual vs Predicted for ' + box_type)
         plt.tight_layout()
-        plt.savefig(f'../res/actual_vs_predicted_{time_horizon}w_{box_type}.png')
+        plt.savefig(f'{res_dir}/actual_vs_predicted_{time_horizon}w_{box_type}.png')
         plt.close()
 
 
@@ -142,7 +185,7 @@ def RF_forecast(df, box_types, time_horizon=1):
     sns.barplot(x=feature_importances, y=feature_importances.index, orient='h')
     plt.title('Feature Importances for Global Model')
     plt.tight_layout()
-    plt.savefig(f'../res/feature_importances_{time_horizon}w.png')
+    plt.savefig(f'{res_dir}/feature_importances_{time_horizon}w.png')
     plt.close()
 
 
@@ -152,28 +195,28 @@ def RF_forecast(df, box_types, time_horizon=1):
     print(f'R^2 for global model: {test_df_concat[target].corr(test_df_concat["predicted_box_orders_global"])}')
     plt.title('Actual vs Predicted for Global Model')
     plt.tight_layout()
-    plt.savefig(f'../res/actual_vs_predicted_regplot_{time_horizon}w.png')
+    plt.savefig(f'{res_dir}/actual_vs_predicted_regplot_{time_horizon}w.png')
     plt.close()
 
     # same for the dummy regressor
     sns.regplot(data=test_df_concat, x = target, y = 'dummy_regressor')
     plt.title('Actual vs Dummy Regressor for Global Model') 
     plt.tight_layout()
-    plt.savefig(f'../res/actual_vs_dummy_regressor_regplot_{time_horizon}w.png')
+    plt.savefig(f'{res_dir}/actual_vs_dummy_regressor_regplot_{time_horizon}w.png')
     plt.close()
 
     # plot distribution of predictions in histogram
     sns.histplot(data=test_df_concat, x='predicted_box_orders_global')
     plt.title('Distribution of Predictions for Global Model')
     plt.tight_layout()
-    plt.savefig(f'../res/predictions_distribution_{time_horizon}w.png')
+    plt.savefig(f'{res_dir}/predictions_distribution_{time_horizon}w.png')
     plt.close()
 
     # plot distribution of actual in histogram
     sns.histplot(data=test_df_concat, x=target)
     plt.title('Distribution of Actual for Global Model')
     plt.tight_layout()
-    plt.savefig(f'../res/actual_distribution_{time_horizon}w.png')
+    plt.savefig(f'{res_dir}/actual_distribution_{time_horizon}w.png')
     plt.close()
 
     return test_df_concat, train_df_concat, mae_global, rf_regressor_global, features, box_type_features, rolling_features, leaky_features

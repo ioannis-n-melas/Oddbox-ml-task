@@ -12,8 +12,11 @@ pd.set_option('display.max_columns', 40)
 
 if __name__ == '__main__':
 
+    res_dir = '../res'
+    data_dir = '../data'
+
     # Load the data
-    df = lib.data_preprocessing()
+    df = lib.data_preprocessing(data_dir)
 
     # get box_types
     box_types = df['box_type'].unique()
@@ -44,6 +47,6 @@ if __name__ == '__main__':
     plt.savefig('../res/total_box_orders_overall.png')
     plt.close()
 
-    test_df_concat, train_df_concat, mae_global, rf_regressor_global, features, box_type_features, rolling_features, leaky_features = lib.RF_forecast(df, box_types, time_horizon=1)
-    test_df_concat, train_df_concat, mae_global, rf_regressor_global, features, box_type_features, rolling_features, leaky_features = lib.RF_forecast(df, box_types, time_horizon=4)
+    test_df_concat, train_df_concat, mae_global, rf_regressor_global, features, box_type_features, rolling_features, leaky_features = lib.RF_forecast(df, box_types, time_horizon=1, res_dir=res_dir)
+    test_df_concat, train_df_concat, mae_global, rf_regressor_global, features, box_type_features, rolling_features, leaky_features = lib.RF_forecast(df, box_types, time_horizon=4, res_dir=res_dir)
 
