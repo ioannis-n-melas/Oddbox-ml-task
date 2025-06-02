@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from prophet import Prophet
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 def prophet_forecast(df_fb, target, features):
@@ -203,80 +204,144 @@ sns.lineplot(data=df, x=df.index, y='total_box_orders')
 plt.savefig('total_box_orders_overall.png')
 plt.close()
 
-# # iterate across box_types
-# for box_type in box_types:
-#     # keep only boxType_FB == 1
-#     df_fb = df[df['boxType_FB'] == 1]
+# iterate across box_types
+feature_importances_list = [] # list to store feature importances
+mae_list = [] # list to store MAEs
+test_df_list = [] # list to store test dataframes
+train_df_list = [] # list to store train dataframes
 
-#     # features = all columns except box_orders, total_box_orders, and columns with boxType_ in the name
-#     features = [col for col in df.columns if col not in ['box_orders', 'total_box_orders'] and not col.startswith('boxType_')]
+box_type = 'FB'
+for box_type in box_types:
+    # keep only boxType_ == box_type
+    df_i = df[df['boxType_' + box_type] == 1]
 
+    # features = all columns except box_orders, total_box_orders, and columns with boxType_ in the name
+    features = [col for col in df_i.columns if col not in ['box_orders', 'total_box_orders'] and not col.startswith('boxType_')]
 
-# keep only boxType_FB == 1
-df_fb = df[df['boxType_FB'] == 1]
+    target = 'box_orders'
 
-# features = all columns except box_orders, total_box_orders, and columns with boxType_ in the name
-features = [col for col in df.columns if col not in ['box_orders', 'total_box_orders'] and not col.startswith('boxType_')]
+    # time series forecasting
+    # sort by week
+    df_i = df_i.sort_values(by='week')
 
-# target = box_orders
-target = 'box_orders'
+    # calculate rolling average of all features and target 1, 2, 4, 6, 8, 12 weeks ago without the current week
+    # window_size = 2
+    for window_size in [1, 2, 4, 6, 8, 12]:
+        df_i[f'{target}_rolling_mean_{window_size}w'] = df_i[target].shift(1).rolling(window=window_size, min_periods=1).mean()
+        for feature in [x for x in features if x != 'week']:
+            # Ensure the feature column exists before trying to calculate rolling mean
+            if feature in df_i.columns:
+                df_i[f'{feature}_rolling_mean_{window_size}w'] = df_i[feature].shift(1).rolling(window=window_size, min_periods=1).mean()
 
-# time series forecasting
-# sort by week
-df_fb = df_fb.sort_values(by='week')
+    # drop rows with NaN
+    df_i = df_i.dropna()
 
-# calculate rolling average of all features and target 1, 2, 4, 6, 8, 12 weeks ago without the current week
-# window_size = 2
-for window_size in [1, 2, 4, 6, 8, 12]:
-    df_fb[f'{target}_rolling_mean_{window_size}w'] = df_fb[target].shift(1).rolling(window=window_size, min_periods=1).mean()
-    for feature in [x for x in features if x != 'week']:
-        # Ensure the feature column exists before trying to calculate rolling mean
-        if feature in df_fb.columns:
-            df_fb[f'{feature}_rolling_mean_{window_size}w'] = df_fb[feature].shift(1).rolling(window=window_size, min_periods=1).mean()
+    # leaky features
+    leaky_features = ['weekly_subscribers', 'fortnightly_subscribers']
 
-# drop rows with NaN
-df_fb = df_fb.dropna()
+    # rolling features
+    rolling_features = df_i.columns[df_i.columns.str.contains('rolling_mean_')].tolist()
 
-# leaky features
-leaky_features = ['weekly_subscribers', 'fortnightly_subscribers']
+    # train test split at 80/20
+    train_df = df_i.iloc[:int(len(df_i) * 0.8)]
+    test_df = df_i.iloc[int(len(df_i) * 0.8):]
+
+    # train Random Forest regressor
+    rf_regressor = RandomForestRegressor(n_estimators=1000, random_state=42, max_depth=5)
+    rf_regressor.fit(train_df[rolling_features + features].drop(columns=leaky_features).drop(columns='week'), train_df[target])
+
+    # predict on test set
+    test_df['predicted_box_orders_' + box_type] = rf_regressor.predict(test_df[rolling_features + features].drop(columns=leaky_features).drop(columns='week'))
+
+    # also assign to predicted_box_orders
+    test_df['predicted_box_orders'] = test_df['predicted_box_orders_' + box_type]
+
+    # calculate MAE
+    mae = mean_absolute_error(test_df[target], test_df['predicted_box_orders_' + box_type])
+    print(f'MAE for {box_type}: {mae}')
+
+    # plot feature importance
+    importances = rf_regressor.feature_importances_
+    feature_names = train_df[rolling_features + features].drop(columns=leaky_features).drop(columns='week').columns.tolist()
+    feature_importances = pd.Series(importances, index=feature_names)
+
+    # sort by importance
+    feature_importances = feature_importances.sort_values(ascending=False)
+
+    # store feature importances
+    feature_importances_list.append(feature_importances)
+
+    # sns barplot of feature importance
+    sns.barplot(x=feature_importances, y=feature_importances.index, orient='h')
+    plt.title('Feature Importances for ' + box_type)
+    plt.xlabel('Importance')
+    plt.ylabel('Feature Name')
+    plt.tight_layout()
+    plt.savefig('feature_importances_' + box_type + '.png')
+    plt.close()
+
+    # plot actual vs predicted
+    sns.lineplot(data=test_df, x=test_df.index, y=target, label='Actual')
+    sns.lineplot(data=test_df, x=test_df.index, y='predicted_box_orders_' + box_type, label='Predicted')
+    plt.title('Actual vs Predicted for ' + box_type)
+    plt.tight_layout()
+    plt.savefig('actual_vs_predicted_' + box_type + '.png')
+    plt.close()
+
+    # store test dataframe
+    test_df_list.append(test_df)
+
+    # store MAE
+    mae_list.append(mae)
+
+    # store train dataframe
+    train_df_list.append(train_df)
+
+# concat train dataframes
+train_df_concat = pd.concat(train_df_list)
+
+# concat test dataframes
+test_df_concat = pd.concat(test_df_list)
+
+# concat feature importances
+feature_importances_concat = pd.concat(feature_importances_list)
+
+# Train a new RF on the concatenated train dataframes
+box_type_features = train_df_concat.columns[train_df_concat.columns.str.contains('boxType_')].tolist()
 
 # rolling features
-rolling_features = df_fb.columns[df_fb.columns.str.contains('rolling_mean_')].tolist()
+rolling_features = train_df_concat.columns[train_df_concat.columns.str.contains('rolling_mean_')].tolist()
 
-# train test split at 80/20
-train_df = df_fb.iloc[:int(len(df_fb) * 0.8)]
-test_df = df_fb.iloc[int(len(df_fb) * 0.8):]
+rf_regressor_concat = RandomForestRegressor(n_estimators=1000, random_state=42, max_depth=10)
+rf_regressor_concat.fit(train_df_concat[rolling_features + box_type_features + features].drop(columns=leaky_features).drop(columns='week'), train_df_concat[target])
 
-# train Random Forest regressor
-from sklearn.ensemble import RandomForestRegressor
-rf_regressor = RandomForestRegressor(n_estimators=1000, random_state=42, max_depth=5)
-rf_regressor.fit(train_df[rolling_features + features].drop(columns=leaky_features).drop(columns='week'), train_df[target])
+# Predict on the concatenated test dataframes
+test_df_concat['predicted_box_orders_concat'] = rf_regressor_concat.predict(test_df_concat[rolling_features + box_type_features + features].drop(columns=leaky_features).drop(columns='week'))
 
-# predict on test set
-test_df['predicted_box_orders'] = rf_regressor.predict(test_df[rolling_features + features].drop(columns=leaky_features).drop(columns='week'))
-
-# calculate MAE and RMSE
-import sklearn.metrics as metrics
-mae = metrics.mean_absolute_error(test_df[target], test_df['predicted_box_orders'])
-rmse = np.sqrt(metrics.mean_squared_error(test_df[target], test_df['predicted_box_orders']))
-print(f'MAE: {mae}, RMSE: {rmse}')
-
-# plot feature importance
-importances = rf_regressor.feature_importances_
-feature_names = train_df[rolling_features + features].drop(columns=leaky_features).drop(columns='week').columns.tolist()
-feature_importances = pd.Series(importances, index=feature_names)
-
-# sort by importance
-feature_importances = feature_importances.sort_values(ascending=False)
-
-# sns barplot of feature importance
-sns.barplot(x=feature_importances, y=feature_importances.index, orient='h')
-plt.title('Feature Importances')
-plt.xlabel('Importance')
-plt.ylabel('Feature Name')
-plt.savefig('feature_importances.png')
+# Calculate MAE
+mae_concat = mean_absolute_error(test_df_concat[target], test_df_concat['predicted_box_orders_concat'])
+print(f'MAE for concatenated data: {mae_concat}')
 
 # plot actual vs predicted
-sns.lineplot(data=test_df, x=test_df.index, y=target, label='Actual')
-sns.lineplot(data=test_df, x=test_df.index, y='predicted_box_orders', label='Predicted')
-plt.savefig('actual_vs_predicted.png')
+sns.lineplot(data=test_df_concat, x=test_df_concat.index, y=target, label='Actual')
+sns.lineplot(data=test_df_concat, x=test_df_concat.index, y='predicted_box_orders_concat', label='Predicted')
+plt.title('Actual vs Predicted for Concatenated Data')
+plt.tight_layout()
+plt.savefig('actual_vs_predicted_concat.png')
+plt.close()
+
+# plot actual vs predicted for each box type
+sns.lineplot(data=test_df_concat, x=test_df_concat.index, y=target, label='Actual')
+sns.lineplot(data=test_df_concat, x=test_df_concat.index, y='predicted_box_orders', label='Predicted')
+plt.title('Actual vs Predicted for Each Box Type')
+plt.tight_layout()
+plt.savefig('actual_vs_predicted_each_box_type.png')
+plt.close()
+
+
+# also sns regplot of actual vs predicted for each box type
+sns.regplot(data=test_df_concat, x=target, y='predicted_box_orders', hue='box_type')
+plt.title('Actual vs Predicted for Each Box Type')
+plt.tight_layout()
+plt.savefig('actual_vs_predicted_each_box_type_regplot.png')
+plt.close()
