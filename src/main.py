@@ -49,12 +49,12 @@ if __name__ == '__main__':
 
     # plot box orders by box type
     sns.lineplot(data=df, x=df.index, y='box_orders', hue='box_type')
-    plt.savefig('box_orders_by_type.png')
+    plt.savefig('../res/box_orders_by_type.png')
     plt.close()
 
     # same without hue
     sns.lineplot(data=df, x=df.index, y='box_orders')
-    plt.savefig('box_orders_overall.png')
+    plt.savefig('../res/box_orders_overall.png')
     plt.close()
 
     # df[['box_type', 'week', 'is_marketing_week']].pivot_table(index='week', columns='box_type', values='is_marketing_week')
@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     # plot total_box_orders
     sns.lineplot(data=df, x=df.index, y='total_box_orders')
-    plt.savefig('total_box_orders_overall.png')
+    plt.savefig('../res/total_box_orders_overall.png')
     plt.close()
 
     test_df_concat, train_df_concat, mae_global, rf_regressor_global, features, box_type_features, rolling_features, leaky_features = lib.RF_forecast(df)
