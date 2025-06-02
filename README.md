@@ -202,6 +202,12 @@ The model generates several visualizations to evaluate its performance for both 
 *This histogram shows the distribution of actual box order values in the test set for the 4-week horizon, serving as a reference to evaluate the realism of the model's prediction distribution.*
 
 
+## Future Work
+
+- Analyze box composition: Investigate the ingredients of each box to understand if similarities in composition influence customer choices or switching patterns. For example, do customers switch between boxes that share common ingredients or have similar sizes?
+- Individual subscriber data: Incorporate data on individual subscriber behavior to model how users transition between different box types. This could reveal patterns related to preferences, seasonality, or responses to promotions, leading to more accurate and personalized forecasts.
+
+
 ## Dependencies
 
 - pandas
